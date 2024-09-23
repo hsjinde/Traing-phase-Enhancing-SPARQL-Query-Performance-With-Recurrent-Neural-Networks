@@ -32,6 +32,8 @@ def create_model(wordsList, wordVectors, posList, posVectors, W, U, layers=1, bi
 
 
 #### Using BERT
+from keras import backend as K
+
 class CreateModel:  
     def create_layer(U, maxlen, num_layers):
         K.clear_session()

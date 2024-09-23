@@ -5,6 +5,8 @@ In this repository, we will focus on discussing the Training Phase. For detailed
 
 <img src="./assets/Architecture of the proposed approach.png"></img>
 
+Query phase : [End to End](https://github.com/hsjinde/Query-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks)
+
 ## Environment
 
 - python version : `3.7.16`
@@ -35,7 +37,7 @@ This study introduces a model based on Binary Relevance (BR) and Classifier Chai
 ###  Required documents
 
 source code : [preprocessing.py]((https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/preprocessing.py))
-
+ 
 #### Word Embedding
 - [GloVe](https://nlp.stanford.edu/projects/glove/): Global Vectors for Word Representation
 
@@ -49,10 +51,14 @@ provides this program POS embedding : `./POS embedding/pos_emb_win5_size20.txt`
 
 ### BR
 
-source code : Binary Relevance.py
+source code : [Binary Relevance.py](https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/Binary%20Relevance.py)
 
 ### CC
 
+source code : [Classifier Chains.py]((https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/Classifier%20Chains.py))
+
 ### Ensemble BR
+
+The ensemble BR framework trains the correlation between labels, allowing for the prediction of SPARQL queries involving multiple RDF triples while considering the correlation between labels.
 
 <img src="./assets/Ensemble BR.png" width="350  px"></img>
