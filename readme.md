@@ -12,6 +12,11 @@ Query phase : [End to End](https://github.com/hsjinde/Query-phase-Enhancing-SPAR
 - python version : `3.7.16`
 - requirements : pip3 install -r requirements.txt
 
+## Training Data
+- [QALD](https://github.com/ag-sc/QALD/tree/master)
+- [LC-QuAD](https://github.com/AskNowQA/LC-QuAD)
+- Provide our format : [LC-QuAD data](https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/tree/main/Data) 
+
 ## Multi-label Tagging
 
 source code : [AutotagTarget.py](https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/AutotagTarget.py)
@@ -55,7 +60,7 @@ source code : [Binary Relevance.py](https://github.com/hsjinde/Traing-phase-Enha
 
 ### CC
 
-source code : [Classifier Chains.py]((https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/Classifier%20Chains.py))
+source code : [Classifier Chains.py](https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/Classifier%20Chains.py)
 
 ### Ensemble BR
 
