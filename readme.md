@@ -34,14 +34,13 @@ flowchart LR
 
 ## Traing phase
 
-
 This study introduces a model based on Binary Relevance (BR) and Classifier Chains (CC) methods. It has three layers: Input (using Word and POS Embeddings), Modeling (Bi-directional LSTM for feature extraction), and Output (sigmoid activation for label relevance). BR treats each label-question pair as an independent binary classification, while CC incorporates previous label predictions to capture label correlations, improving training.
 
 <img src="./assets/System architecture diagram.png" width="650px"></img>
 
 ###  Required documents
 
-source code : [preprocessing.py]((https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/preprocessing.py))
+source code : [preprocessing.py](https://github.com/hsjinde/Traing-phase-Enhancing-SPARQL-Query-Performance-With-Recurrent-Neural-Networks/blob/main/preprocessing.py)
  
 #### Word Embedding
 - [GloVe](https://nlp.stanford.edu/projects/glove/): Global Vectors for Word Representation
