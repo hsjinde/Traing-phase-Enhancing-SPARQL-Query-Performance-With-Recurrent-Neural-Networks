@@ -1,57 +1,90 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import (
+    Add,
+    BatchNormalization,
+    Bidirectional,
+    Concatenate,
+    Dense,
+    Embedding,
+    GlobalMaxPooling1D,
+    Input,
+    LSTM,
+    LayerNormalization,
+)
+from transformers import TFAutoModel
 
-#### Using Glove
-def create_model(wordsList, wordVectors, posList, posVectors, W, U, layers=1, bidirectional=False, use_pos=False):
+
+def create_model(
+    wordsList,
+    wordVectors,
+    posList,
+    posVectors,
+    W,
+    U,
+    layers=1,
+    bidirectional=False,
+    use_pos=False,
+    maxlen=20,
+):
     K.clear_session()
-    
-    word_input = Input(shape=(maxlen,))
+
+    word_input = Input(shape=(maxlen,), name="word_input")
     word_embed = Embedding(len(wordsList), W, weights=[np.array(wordVectors)], trainable=False)(word_input)
-    
+
     inputs = [word_input]
-    
+
     if use_pos:
-        pos_input = Input(shape=(maxlen,))
+        pos_input = Input(shape=(maxlen,), name="pos_input")
         pos_embed = Embedding(len(posList), 20, weights=[np.array(posVectors)], trainable=False)(pos_input)
-        data_concatenate = Concatenate()([word_embed, pos_embed])
+        x = Concatenate()([word_embed, pos_embed])
         inputs.append(pos_input)
     else:
-        data_concatenate = word_embed
-    
-    if bidirectional:
-        lstm_layer = Bidirectional(LSTM(U, return_sequences=(layers > 1)))(data_concatenate)
-    else:
-        lstm_layer = LSTM(U, return_sequences=(layers > 1))(data_concatenate)
-    
-    for _ in range(layers - 1):
-        dense_1 = Dense(U * 2)(lstm_layer)
-        add = Add()([dense_1, lstm_layer])
-        norm = LayerNormalization()(add)
+        x = word_embed
+
+    for _ in range(max(layers - 1, 0)):
+        residual = Dense(U * 2 if bidirectional else U)(x)
         if bidirectional:
-            lstm_layer = Bidirectional(LSTM(U, return_sequences=False))(norm)
+            x = Bidirectional(LSTM(U, return_sequences=True))(residual)
         else:
-            lstm_layer = LSTM(U, return_sequences=False)(norm)
+            x = LSTM(U, return_sequences=True)(residual)
+        x = Add()([residual, x])
+        x = LayerNormalization()(x)
+
+    if bidirectional:
+        x = Bidirectional(LSTM(U, return_sequences=False))(x)
+    else:
+        x = LSTM(U, return_sequences=False)(x)
+
+    output = Dense(1, activation="sigmoid", name="outputs")(x)
+    model = tf.keras.Model(inputs=inputs, outputs=output)
+    model.compile(optimizer=tf.keras.optimizers.Adam(0.001), loss="binary_crossentropy", metrics=["accuracy"])
+    return model
 
 
-#### Using BERT
-from keras import backend as K
-
-class CreateModel:  
-    def create_layer(U, maxlen, num_layers):
+class BertBinaryRelevanceModel:
+    @staticmethod
+    def create_layer(U, maxlen=20, num_layers=1):
         K.clear_session()
-        bert = TFAutoModel.from_pretrained('bert-base-cased')
-        input_ids = Input(shape=(maxlen,), dtype='int32')
-        mask = Input(shape=(maxlen,), dtype='int32')
-        embeddings = bert(input_ids, attention_mask=mask)[0]
-        embeddings = BatchNormalization()(embeddings)
-        
-        x = Dense(U * 2)(embeddings)
+        bert = TFAutoModel.from_pretrained("bert-base-cased")
+        input_ids = Input(shape=(maxlen,), name="input_ids", dtype="int32")
+        mask = Input(shape=(maxlen,), name="attention_mask", dtype="int32")
+        x = bert(input_ids, attention_mask=mask)[0]
+        x = BatchNormalization()(x)
+
         for _ in range(num_layers):
-            lstm_layer = Bidirectional(LSTM(U, return_sequences=False))(x)
-            x = Add()([x, lstm_layer])
+            residual = Dense(U * 2)(x)
+            x = Bidirectional(LSTM(U, return_sequences=True))(residual)
+            x = Add()([residual, x])
             x = LayerNormalization()(x)
-            x = Dense(U * 2)(x)
-        
-        output = Dense(1, activation='sigmoid')(x)
+
+        x = GlobalMaxPooling1D()(x)
+        output = Dense(1, activation="sigmoid", name="outputs")(x)
         model = tf.keras.Model(inputs=[input_ids, mask], outputs=output)
-        model.layers[2].trainable = False
-        model.compile(optimizer=tf.keras.optimizers.Adam(0.001), loss='binary_crossentropy', metrics=['accuracy'])
+        bert.trainable = False
+        model.compile(optimizer=tf.keras.optimizers.Adam(0.001), loss="binary_crossentropy", metrics=["accuracy"])
         return model
+
+
+CreateModel = BertBinaryRelevanceModel

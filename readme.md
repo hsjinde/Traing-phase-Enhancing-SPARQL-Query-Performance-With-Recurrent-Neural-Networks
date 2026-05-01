@@ -86,35 +86,62 @@ Additionally, we provide our formatted version of [LC-QuAD data](https://github.
 
 ## Execution
 
-### Steps to Execute the Training Phase:
-1. **Prepare Datasets**:
-   - Download QALD-7, QALD-8, QALD-9, and LC-QuAD datasets.
-   - Preprocess them into the required format (e.g., JSON with question strings, keywords, and SPARQL queries).
-   - Example preprocessing script:
-     ```bash
-     python preprocess.py --input data/raw --output data/processed
-     ```
-
-2. **Set Up Environment**:
+### Steps to Use the Training Utilities:
+1. **Set Up Environment**:
+   - Create a Python 3.8 environment. The pinned TensorFlow dependency is from the TensorFlow 2.x era used by the original implementation.
    - Install dependencies:
      ```bash
      pip install -r requirements.txt
      ```
-   - Ensure GPU support for TensorFlow/PyTorch.
 
-3. **Run Training Script**:
-   - Configure hyperparameters in the script (e.g., `config.py`).
-   - Example command:
-     ```bash
-     python train.py --dataset qald-7 --model ensemble_br --embedding glove --epochs 50
+2. **Prepare Datasets**:
+   - The repository includes a formatted LC-QuAD workbook at `Data/LCQUAD.xlsx`.
+   - Use `AutotagTarget.py` to derive target labels from a dataframe that contains a `query` column:
+     ```python
+     import pandas as pd
+     from AutotagTarget import GetTarget
+
+     train_data = pd.read_excel("Data/LCQUAD.xlsx")
+     processed_data = GetTarget(train_data)
      ```
 
-4. **Save Models**:
-   - Store trained models for use in the query phase.
-   - Example:
-     ```bash
-     python save_model.py --output models/ensemble_br
+3. **Prepare Embeddings**:
+   - POS embeddings are included at `POS embedding/pos_emb_win5_size20.txt` and loaded by `preprocessing.PosEmbedding()`.
+   - GloVe files are not bundled because of their size. Download the required `glove.6B.<size>d.txt` file and place it in a sibling `Embedding` directory, matching the path expected by `preprocessing.WordEmbedding()`.
+
+4. **Build Models**:
+   - Binary Relevance GloVe model:
+     ```python
+     from Binary_Relevance import create_model
+
+     model = create_model(...)
      ```
+   - Classifier Chains models are exposed as `CreateGloveModel` and `CreateBertModel`:
+     ```python
+     from Classifier_Chains import CreateGloveModel, CreateBertModel
+     ```
+
+This repository currently provides reusable preprocessing and model-construction modules rather than a single end-to-end training command.
+
+---
+
+## Project Structure
+
+| Path | Purpose |
+|------|---------|
+| `AutotagTarget.py` | Converts SPARQL query patterns into training labels. |
+| `preprocessing.py` | Loads embeddings and transforms natural-language questions into model inputs. |
+| `Binary Relevance.py` / `Binary_Relevance.py` | Binary Relevance model builders and import-friendly wrapper. |
+| `Classifier Chains.py` / `Classifier_Chains.py` | Classifier Chain model builders and import-friendly wrapper. |
+| `Data/LCQUAD.xlsx` | Formatted LC-QuAD training data. |
+| `POS embedding/` | POS embedding file used by preprocessing. |
+| `tests/` | Regression tests for label extraction and embedding loading utilities. |
+
+Run the lightweight regression tests with:
+
+```bash
+python -m unittest discover -s tests
+```
 
 ---
 

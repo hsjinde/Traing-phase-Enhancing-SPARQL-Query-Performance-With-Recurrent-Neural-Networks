@@ -1,167 +1,159 @@
-'''
-useage:
-    train_data = pd.read_excel('LCQUAD.xlsx')
+"""
+Utilities for deriving training labels from SPARQL query triples.
+
+Example:
+    import pandas as pd
+    from AutotagTarget import GetTarget
+
+    train_data = pd.read_excel("Data/LCQUAD.xlsx")
     processed_data = GetTarget(train_data)
-'''
+"""
 
-import numpy as np
-import pandas as pd
 import re
-import math
+from collections import Counter
 
-#select SELECT DISTINCT
-#ASK WHERE
 
-Labletrans = {
-    'S P ?ans ' : 'A',
-    'S P ?x ' : 'a',
-    '?ans P O ' : 'B',
-    '?x P O ' : 'b',
-    '?ans P ?x ' :'C',
-    '?x P ?ans ' : 'c',
-    'S P O ' : 'D',
-    }
+LABEL_TRANSITIONS = {
+    "S P ?ans ": "A",
+    "S P ?x ": "a",
+    "?ans P O ": "B",
+    "?x P O ": "b",
+    "?ans P ?x ": "C",
+    "?x P ?ans ": "c",
+    "S P O ": "D",
+}
 
-#train_data = pd.read_excel( "./Data/QALD9train.xlsx")
-#train_data = pd.read_excel( "./Data/LCQUAD.xlsx",sheet_name='LCQUAD')
+# Backwards-compatible name used by the original script.
+Labletrans = LABEL_TRANSITIONS
+
+LABEL_SEQUENCE = {
+    "A": ["A", "E", "H"],
+    "a": ["a", "e", "h"],
+    "B": ["B", "F", "I"],
+    "b": ["b", "f", "i"],
+    "C": ["C", "G", "J"],
+    "c": ["c", "g", "j"],
+    "D": ["D"],
+}
+
 
 def GetTarget(train_data):
-    col_name = train_data.columns.tolist()
-    col_name.insert(2,'lable') 
-    train_data = train_data.reindex(columns=col_name)
-    
-    query = train_data["query"].copy() #不改train_data
-    parentheses = re.compile(r'[{](.*)[}]', re.S)    
-    for i in range(len(query)):
-        while 1 :
-            if "".join(re.findall(parentheses, query[i])) == "":
-                break
-            else:
-                query[i] = "".join(re.findall(parentheses, query[i])) #list to string
-        query[i] = GetSPO(query[i])
-        #query[i] = Delrdftype(query[i])
-        query[i] = Convert_question_mark(query[i], train_data, i)
-        get_target(train_data,query[i],i)
-        train_data['lable'][i] = get_lable(train_data['lable'][i])
+    if "query" not in train_data.columns:
+        raise KeyError("GetTarget expects a dataframe with a 'query' column.")
+
+    train_data = train_data.copy()
+    if "lable" not in train_data.columns:
+        insert_at = min(2, len(train_data.columns))
+        train_data.insert(insert_at, "lable", None)
+
+    for index, sparql in train_data["query"].items():
+        query_body = _extract_query_body(str(sparql))
+        spo_pattern = GetSPO(query_body)
+        normalized_pattern = Convert_question_mark(spo_pattern, train_data, index)
+        raw_labels = get_target(normalized_pattern)
+        train_data.at[index, "lable"] = get_lable(raw_labels)
+
     return train_data
 
-def GetSPO(subquery):
-    temp = []
-    count = 0
-    subspo = subquery.split()
-    for i in range(len(subspo)):
-        if subspo[i] =="." or subspo[i] ==";":
-            continue
-        if "?" in subspo[i]:
-            delperiod = ''
-            for j in subspo[i]:
-                if j != ".":
-                    delperiod = delperiod+j
-            temp.append(delperiod)
-            count +=1
-        else :
-            if count%3 == 0:
-                temp.append("S")
-            if count%3 == 1:
-                    temp.append("P")
-            if count%3 == 2:
-                temp.append("O")
-            count +=1
-    return temp
 
-#沒用到
+def _extract_query_body(query):
+    match = re.search(r"\{(.*)\}", query, re.S)
+    return match.group(1) if match else query
+
+
+def GetSPO(subquery):
+    pattern = []
+    variable_count = 0
+
+    for token in subquery.split():
+        if token in {".", ";"}:
+            continue
+
+        token = token.rstrip(".")
+        if "?" in token:
+            pattern.append(token)
+        else:
+            pattern.append(("S", "P", "O")[variable_count % 3])
+        variable_count += 1
+
+    return pattern
+
+
 def Delrdftype(query):
-    if "rdf:type" in query:
-        #print(query.index("rdf:type"))
-        typeloc = query.index("rdf:type")
-        i = 0
-        while i < 3:
-            del query[typeloc-1]
-            i +=1
+    query = list(query)
+    while "rdf:type" in query:
+        type_index = query.index("rdf:type")
+        del query[max(type_index - 1, 0) : type_index + 2]
     return query
+
 
 def Getans(query):
-    select_distinct = query.split()
-    regular_ans = re.compile(r'[()](.*)[)]', re.S)
-    if select_distinct[0] == 'SELECT' and select_distinct[1] == 'DISTINCT' and '?' in select_distinct[2]:
-        if '(' in select_distinct[2]:
-            select_distinct[2] = "".join(re.findall(regular_ans,select_distinct[2]))
-        return select_distinct[2]
-      
-    #ans = train_data["query"][32]
-    while 1:
-        if "".join(re.findall(regular_ans,query)) == "":
-            break
-        query = "".join(re.findall(regular_ans,query))
-    query = query.split()
-    query = query[1]
-    
-    return query
+    tokens = query.split()
+    if len(tokens) >= 3 and tokens[0].upper() == "SELECT" and tokens[1].upper() == "DISTINCT" and "?" in tokens[2]:
+        return tokens[2].strip("()")
 
-def Convert_question_mark(query, train_data,index):
-    temp = []
-    ans_candidate = []
-    for i in query:
-        if '?' in i and i not in ans_candidate:
-            ans_candidate.append(i)
-    if len(ans_candidate) > 1:
-        ans = Getans(train_data['query'][index])
-        if "?" not in ans:
-            ans = '?w'
-    elif len(ans_candidate) == 1:
-        ans = ans_candidate[0]
-    for i in query:
-        if '?' in i :
-            if i == ans:
-                temp.append('?ans')
-            else:
-                temp.append('?x')
+    select_match = re.search(r"\bSELECT\b\s+(?:DISTINCT\s+)?(?:\([^)]*\)\s+)?(\?\w+)", query, re.I)
+    if select_match:
+        return select_match.group(1)
+
+    variables = re.findall(r"\?\w+", query)
+    return variables[0] if variables else None
+
+
+def Convert_question_mark(query, train_data, index):
+    variables = []
+    for token in query:
+        if "?" in token and token not in variables:
+            variables.append(token)
+
+    if not variables:
+        return list(query)
+
+    ans = variables[0]
+    if len(variables) > 1:
+        detected_ans = Getans(str(train_data.at[index, "query"]))
+        if detected_ans in variables:
+            ans = detected_ans
+
+    normalized = []
+    for token in query:
+        if "?" in token:
+            normalized.append("?ans" if token == ans else "?x")
         else:
-            temp.append(i)
-    return temp
+            normalized.append(token)
+    return normalized
 
-def get_target(train_data,query,index):
-    target = []
-    k = 0
-    for i in range(int(len(query)/3)):
-        temp = ''
-        for j in range(3):
-            temp = temp +''.join(query[k])+' '
-            k += 1
-        #print(temp)
-        target.append(Labletrans[temp])
-    train_data['lable'][index] = target 
+
+def get_target(*args):
+    if len(args) == 3:
+        train_data, query, index = args
+    elif len(args) == 1:
+        train_data, query, index = None, args[0], None
+    else:
+        raise TypeError("get_target expects query or train_data, query, index.")
+
+    labels = []
+    for i in range(0, len(query) - 2, 3):
+        pattern = f"{query[i]} {query[i + 1]} {query[i + 2]} "
+        label = LABEL_TRANSITIONS.get(pattern)
+        if label is not None:
+            labels.append(label)
+
+    if train_data is not None:
+        train_data.at[index, "lable"] = labels
+
+    return labels
+
 
 def get_lable(lable):
-    # 定義映射規則
-    mapping = {
-        'A': ['A', 'E', 'H'],
-        'a': ['a', 'e', 'h'],
-        'B': ['B', 'F', 'I'],
-        'b': ['b', 'f', 'i'],
-        'C': ['C', 'G', 'J'],
-        'c': ['c', 'g', 'j'],
-        'D': ['D']
-    }
-    
-    new_lable = []
-    
-    # 若 lable 為空，返回 ['d']
     if not lable:
-        return ['d']
-    
-    for key, values in mapping.items():
-        if key in lable:
-            lable.remove(key)
-            new_lable.append(values[0])
-            values.pop(0)  # 移除已使用的第一個元素
-    
-    # 為剩餘的 label 指派對應的值
-    for key, values in mapping.items():
-        if key in lable:
-            lable.remove(key)
-            new_lable.append(values[0])
-            values.pop(0)
-    
-    return new_lable
+        return ["d"]
 
+    counts = Counter(lable)
+    new_lable = []
+
+    for key, sequence in LABEL_SEQUENCE.items():
+        for label in sequence[: counts.get(key, 0)]:
+            new_lable.append(label)
+
+    return new_lable or ["d"]
